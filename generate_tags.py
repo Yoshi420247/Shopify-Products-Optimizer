@@ -645,6 +645,15 @@ def determine_family_from_content(title: str, body: str, product_type: str) -> D
             'use': ['use:preparation'],
         }
 
+    # Trays - check BEFORE rolling papers since "rolling tray" contains "rolling"
+    if 'tray' in title_lower:
+        return {
+            'pillar': 'pillar:accessory',
+            'family': 'family:tray',
+            'format': 'format:tray',
+            'use': ['use:rolling'],
+        }
+
     # Rolling papers
     if 'paper' in title_lower or 'cone' in title_lower or 'rolling' in title_lower:
         return {
@@ -679,15 +688,6 @@ def determine_family_from_content(title: str, body: str, product_type: str) -> D
             'family': 'family:downstem',
             'format': 'format:accessory',
             'use': ['use:flower-smoking'],
-        }
-
-    # Trays
-    if 'tray' in title_lower:
-        return {
-            'pillar': 'pillar:accessory',
-            'family': 'family:tray',
-            'format': 'format:tray',
-            'use': ['use:rolling'],
         }
 
     # Storage/Jars
@@ -862,7 +862,7 @@ def generate_tags_for_product(handle: str, title: str, body_html: str, product_t
     elif content_info:
         # Check if title indicates a different product type than the Shopify Type
         title_lower = title.lower()
-        override_keywords = ['ashtray', 'tray', 'match', 'cleaner', 'drop down', 'dropdown', 'pendant']
+        override_keywords = ['ashtray', 'rolling tray', 'tray', 'match', 'cleaner', 'drop down', 'dropdown', 'pendant']
         for keyword in override_keywords:
             if keyword in title_lower:
                 type_info = {**type_info, **content_info}

@@ -150,7 +150,7 @@ TYPE_MAPPING = {
         'pillar': 'pillar:accessory',
         'family': 'family:grinder',
         'format': 'format:grinder',
-        'use': ['use:preparation'],
+        'use': ['use:flower-smoking'],  # Per spec line 498
         'default_material': ['material:metal'],
     },
     'rolling papers': {
@@ -197,10 +197,11 @@ TYPE_MAPPING = {
         'default_material': ['material:silicone'],
     },
     'pendants': {
-        'pillar': 'pillar:accessory',
-        'family': 'family:carb-cap',
-        'format': 'format:cap',
-        'use': ['use:dabbing'],
+        # Most pendants are decorative - determine from content if carb cap
+        'pillar': None,  # Determine from content
+        'family': None,  # Determine from content
+        'format': None,
+        'use': None,
         'default_material': ['material:glass'],
     },
     'packaging': {
@@ -725,21 +726,86 @@ def determine_family_from_content(title: str, body: str, product_type: str) -> D
             'use': ['use:dabbing'],
         }
 
-    # Pendants (decorative)
+    # Pendants - check for carb cap or pipe functionality
     if 'pendant' in title_lower:
-        # Check if it's also a carb cap
-        if 'cap' in title_lower or 'carb' in title_lower:
+        # Check if it's EXPLICITLY a carb cap pendant (must be in title or very early in description)
+        # Title must contain "carb cap" OR first 300 chars of body must explicitly say it IS a carb cap
+        is_carb_cap = False
+        if 'carb cap' in title_lower:
+            is_carb_cap = True
+        elif body_lower:
+            # Check if body explicitly says this IS a carb cap (not just comparing to one)
+            first_part = body_lower[:300]
+            if 'is a' in first_part and 'carb cap' in first_part:
+                is_carb_cap = True
+            elif 'carb cap that' in first_part or 'carb cap pendant' in first_part:
+                is_carb_cap = True
+
+        if is_carb_cap:
             return {
                 'pillar': 'pillar:accessory',
                 'family': 'family:carb-cap',
                 'format': 'format:cap',
                 'use': ['use:dabbing'],
             }
+        # Check if it's a pipe pendant
+        if 'pipe' in title_lower:
+            return {
+                'pillar': 'pillar:smokeshop-device',
+                'family': 'family:spoon-pipe',
+                'format': 'format:pipe',
+                'use': ['use:flower-smoking'],
+            }
+        # Check body for pipe functionality in first 300 chars
+        if body_lower and 'pipe' in body_lower[:300] and 'hand pipe' in body_lower[:400]:
+            return {
+                'pillar': 'pillar:smokeshop-device',
+                'family': 'family:spoon-pipe',
+                'format': 'format:pipe',
+                'use': ['use:flower-smoking'],
+            }
+        # Otherwise it's decorative merch
         return {
             'pillar': 'pillar:merch',
             'family': 'family:merch-pendant',
             'format': 'format:pendant',
             'use': [],
+        }
+
+    # Matches - rolling accessory
+    if 'match' in title_lower:
+        return {
+            'pillar': 'pillar:accessory',
+            'family': 'family:rolling-accessory',
+            'format': 'format:accessory',
+            'use': ['use:rolling'],
+        }
+
+    # Drop downs - similar to downstems
+    if 'drop down' in title_lower or 'dropdown' in title_lower:
+        return {
+            'pillar': 'pillar:accessory',
+            'family': 'family:downstem',
+            'format': 'format:accessory',
+            'use': ['use:flower-smoking'],
+        }
+
+    # Ashtrays - rolling trays
+    if 'ashtray' in title_lower:
+        return {
+            'pillar': 'pillar:accessory',
+            'family': 'family:tray',
+            'format': 'format:tray',
+            'use': ['use:rolling'],
+        }
+
+    # Glass cleaners - rolling accessory (general accessory)
+    if 'cleaner' in title_lower:
+        return {
+            'pillar': 'pillar:accessory',
+            'family': 'family:rolling-accessory',
+            'format': 'format:accessory',
+            'use': ['use:flower-smoking'],
         }
 
     # Check body for hints if nothing found in title
@@ -780,25 +846,37 @@ def generate_tags_for_product(handle: str, title: str, body_html: str, product_t
     # Get type mapping
     type_info = TYPE_MAPPING.get(product_type_lower, None)
 
-    # For theme types or unknown types, determine from content
+    # ALWAYS check content first for products that might be miscategorized
+    # (e.g., ashtray listed under Rolling Papers, matches under Essentials)
+    content_info = determine_family_from_content(title, body, product_type)
+
+    # For theme types or unknown types, use content info
     if type_info is None or type_info.get('pillar') is None or type_info.get('family') is None:
-        content_info = determine_family_from_content(title, body, product_type)
         if content_info:
             if type_info:
                 # Merge with existing type_info
                 type_info = {**type_info, **content_info}
             else:
                 type_info = content_info
+    # For functional types, override if content clearly indicates different product
+    elif content_info:
+        # Check if title indicates a different product type than the Shopify Type
+        title_lower = title.lower()
+        override_keywords = ['ashtray', 'tray', 'match', 'cleaner', 'drop down', 'dropdown', 'pendant']
+        for keyword in override_keywords:
+            if keyword in title_lower:
+                type_info = {**type_info, **content_info}
+                break
 
-        # If still no type_info, use default
-        if not type_info or not type_info.get('pillar'):
-            type_info = {
-                'pillar': 'pillar:accessory',
-                'family': 'family:storage-accessory',
-                'format': 'format:accessory',
-                'use': ['use:flower-smoking'],
-                'default_material': ['material:glass'],
-            }
+    # If still no type_info, use default
+    if not type_info or not type_info.get('pillar'):
+        type_info = {
+            'pillar': 'pillar:accessory',
+            'family': 'family:storage-accessory',
+            'format': 'format:accessory',
+            'use': ['use:flower-smoking'],
+            'default_material': ['material:glass'],
+        }
 
     # 1. Add pillar
     if type_info.get('pillar'):
